@@ -25,7 +25,7 @@ const DEFAULTS = () => ({
   tripCats: [{ k: 'food', l: 'Repas' }, { k: 'stay', l: 'Logement' }, { k: 'transport', l: 'Transport' }, { k: 'act', l: 'Activités' }, { k: 'other', l: 'Autre' }],
   preCats: [{ k: 'flights', l: 'Vols' }, { k: 'insurance', l: 'Assurance' }, { k: 'gear', l: 'Équipement' }, { k: 'health', l: 'Santé & visas' }, { k: 'other', l: 'Autre' }],
   newTrip: '', newPre: '', exps: seed(),
-  phase: 'trip', amount: '', cur: 'LOC', cat: 'food', paidBy: 'you', forWhom: 'both', addDay: null, spread: false, spreadN: 5, note: '', saved: false,
+  phase: 'trip', amount: '', cur: 'LOC', cat: 'food', paidBy: 'you', forWhom: 'both', addDay: null, editId: null, hf: 'all', spread: false, spreadN: 5, note: '', saved: false,
 });
 
 let S;
@@ -145,19 +145,32 @@ const vAdd = V => {
   const self = (s.forWhom === 'you' && s.paidBy === 'you') || (s.forWhom === 'partner' && s.paidBy === 'partner');
   const shareText = s.forWhom === 'both' ? payer + ' paie, partagé 50/50 — ' + other + ' doit la moitié.' : self ? payer + ' paie pour soi — pas de partage.' : payer + ' avance tout — ' + other + ' doit la totalité.';
   const stepper = (less, more, mid) => `<div class="row"><button type="button" class="btn btn-sec btn-icon" data-a="${less}">&minus;</button><div style="flex:1;text-align:center;font-size:18px;font-weight:700">${mid}</div><button type="button" class="btn btn-sec btn-icon" data-a="${more}">+</button></div>`;
-  return `<div class="col" style="gap:16px"><div class="h1">Ajouter une dépense</div>
+  return `<div class="col" style="gap:16px"><div class="h1">${s.editId ? 'Modifier la dépense' : 'Ajouter une dépense'}</div>
   ${seg([['pre', 'Avant le voyage'], ['trip', 'Pendant le voyage']], s.phase, 'setPhase')}
   <div><label class="lbl" style="margin-bottom:5px">Montant</label><div class="row" style="gap:8px"><input class="input" type="text" inputmode="decimal" placeholder="0,00" value="${esc(s.amount)}" data-c="amount" style="flex:1;min-width:0;font-size:20px;font-weight:700">
     ${isTrip ? seg([['LOC', esc(al.c)], ['EUR', 'EUR']], s.cur, 'setCur', 'fit') : ''}</div>
     <div class="meta" style="font-size:12px;margin-top:6px">${loc ? '≈ ' + f2(eur) + ' · 1 ' + esc(al.c) + ' = ' + String(al.r).replace('.', ',') + ' € (taux modifiable dans Plan)' : 'Montant en euros'}</div></div>
   <div><label class="lbl">Catégorie</label><div class="catgrid">${cats.map(c => `<button type="button" class="cat ${s.cat === c.k ? 'on' : ''}" data-a="setCat" data-v="${esc(c.k)}">${svg(IC[c.k] || TAG, 18, 'currentColor')}<span>${esc(c.l)}</span></button>`).join('')}</div></div>
-  ${isTrip ? `<div class="col" style="gap:16px"><div><label class="lbl">Date de la dépense</label>${stepper('dayPrev', 'dayNext', dt(addDay) + ' · Jour ' + addDay)}</div>
+  ${isTrip ? `<div class="col" style="gap:16px"><div><label class="lbl">Date de la dépense (touchez pour ouvrir le calendrier)</label><input class="input" type="date" value="${V.dObj(addDay).toISOString().slice(0, 10)}" data-c="addDate" style="height:48px;font-size:16px;font-weight:700"><div class="meta" style="font-size:12px;margin-top:6px">${dt(addDay)} · Jour ${addDay}${(L.find(l => addDay >= l.s && addDay <= l.e) || {}).n ? ' · ' + esc(L.find(l => addDay >= l.s && addDay <= l.e).n) : ''}</div></div>
     <div class="card" style="border-radius:24px;padding:12px;gap:0"><label class="lbl">Imputation sur le budget</label>${seg([['off', 'Un seul jour'], ['on', 'Lisser sur plusieurs jours']], s.spread ? 'on' : 'off', 'setSpread')}
     ${s.spread ? `<div style="margin-top:12px">${stepper('spreadLess', 'spreadMore', s.spreadN + '&nbsp;jours')}<div style="font-size:12px;margin-top:10px;line-height:1.45"><strong>${f2(eur / n)}</strong> par jour, du&nbsp;${dt(addDay)}&nbsp;au&nbsp;${dt(addDay + s.spreadN - 1)}.</div><div class="meta" style="margin-top:2px">Le budget du jour est impacté de&nbsp;${f2(eur / n)}&nbsp;au lieu de&nbsp;${f2(eur)}.</div></div>` : ''}</div></div>` : ''}
   <div><label class="lbl">Payé par</label>${seg([['you', esc(A)], ['partner', esc(B)]], s.paidBy, 'setPaid')}</div>
   <div><label class="lbl">Pour</label>${seg([['you', esc(A)], ['partner', esc(B)], ['both', 'Les deux']], s.forWhom, 'setFor')}<div class="meta" style="margin-top:6px">${esc(shareText)}</div></div>
   <div class="field"><label>Note (facultatif)</label><input class="input" type="text" placeholder="ex. Trek de 5 jours" value="${esc(s.note)}" data-c="note"></div>
-  <button type="button" class="btn btn-primary" data-a="save">${s.saved ? 'Enregistré ✓' : amt > 0 ? 'Enregistrer' : 'Saisissez un montant'}</button></div>`;
+  <button type="button" class="btn btn-primary" data-a="save">${s.saved ? 'Enregistré ✓' : amt > 0 ? (s.editId ? 'Enregistrer les modifications' : 'Enregistrer') : 'Saisissez un montant'}</button>${s.editId ? '<button type="button" class="btn btn-sec" style="height:44px" data-a="cancelEdit">Annuler la modification</button>' : ''}</div>`;
+};
+
+const vHistory = V => {
+  const { s, L, exps, dt, CL, sum } = V;
+  const legOf = d => L.find(l => d >= l.s && d <= l.e);
+  const hist = exps.filter(e => s.hf === 'all' || (s.hf === 'pre' ? e.ph === 'pre' : e.ph === 'trip' && (legOf(e.day) || {}).i === s.hf)).sort((a, b) => (b.ph === 'pre' ? -1 : b.day) - (a.ph === 'pre' ? -1 : a.day) || b.id - a.id);
+  const chip = (k, name) => `<button type="button" data-a="histFilter" data-v="${k}" style="${st({ padding: '8px 12px', minHeight: 36, borderRadius: 999, fontSize: 12, cursor: 'pointer', border: 'none', fontWeight: s.hf === k ? 800 : 600, background: s.hf === k ? 'var(--a700)' : '#fff', color: s.hf === k ? '#fff' : 'var(--text)' })}">${esc(name)}</button>`;
+  const title = s.hf === 'all' ? 'Toutes les dépenses' : s.hf === 'pre' ? 'Avant le voyage' : (L[s.hf] || {}).n;
+  const who = e => (e.py >= 1 ? 'Payé par ' + V.A : e.py <= 0 ? 'Payé par ' + V.B : 'Payé à deux') + ' · ' + (e.f === 'both' ? 'Partagé' : e.f === 'you' ? 'Juste ' + V.A : 'Juste ' + V.B);
+  return `<div class="col"><div><div class="h1" style="font-weight:800">Historique</div><div class="meta">Touchez une dépense pour la corriger.</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">${chip('all', 'Tout')}${chip('pre', 'Avant le voyage')}${L.map(l => chip(l.i, l.n)).join('')}</div>
+  <div class="card" style="padding:12px 14px;border-radius:22px;gap:0"><div class="row sp" style="align-items:baseline"><span class="kick">${esc(title)}</span><span style="font-size:18px;font-weight:800">${f0(sum(hist))}</span></div><div class="meta">${hist.length} dépense${hist.length > 1 ? 's' : ''}</div></div>
+  <div>${hist.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--divider);cursor:pointer"><div style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--a100);display:flex;align-items:center;justify-content:center">${svg(IC[e.c] || IC.other, 16, 'var(--a700)', 1.8)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(e.ph === 'pre' ? 'Avant le voyage' : dt(e.day) + ' · ' + ((legOf(e.day) || {}).n || '') + (e.auto ? " · cumul de l'étape" : ''))}</div><div class="meta">${esc(who(e))}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}</div><div class="mono" style="font-size:13px;font-weight:700;flex:none">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('')}</div></div>`;
 };
 
 const vBudget = V => {
@@ -229,12 +242,12 @@ const vSettings = V => {
     <button type="button" class="btn btn-sec btn-danger" data-a="clearExps">Supprimer toutes les dépenses (exemples)</button></div></div>`;
 };
 
-const TABS = [['home', 'Accueil', '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'], ['add', 'Ajouter', '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'], ['budget', 'Budget', '<line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="7"/><line x1="19" y1="20" x2="19" y2="14"/>'], ['plan', 'Plan', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'], ['settings', 'Réglages', '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>']];
+const TABS = [['home', 'Accueil', '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'], ['add', 'Ajouter', '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'], ['history', 'Historique', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'], ['budget', 'Budget', '<line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="7"/><line x1="19" y1="20" x2="19" y2="14"/>'], ['plan', 'Plan', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'], ['settings', 'Réglages', '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>']];
 
 function render() {
   const main = document.getElementById('main'), y = main.scrollTop;
   const V = calc();
-  main.innerHTML = { home: vHome, add: vAdd, budget: vBudget, plan: vPlan, settings: vSettings }[S.tab](V);
+  main.innerHTML = { home: vHome, add: vAdd, history: vHistory, budget: vBudget, plan: vPlan, settings: vSettings }[S.tab](V);
   main.scrollTop = y;
   document.getElementById('tabs').innerHTML = TABS.map(([k, l, p]) => `<button type="button" class="${S.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg><span>${l}</span></button>`).join('');
 }
@@ -247,6 +260,9 @@ const A = {
   tab: v => set({ tab: v }, false),
   openBudget: v => set({ tab: 'budget', bview: v }, false),
   delExp: v => set({ exps: S.exps.filter(e => String(e.id) !== v) }),
+  histFilter: v => set({ hf: v === 'all' || v === 'pre' ? v : +v }),
+  editExp: v => { const e = S.exps.find(x => String(x.id) === v); if (!e) return; set({ tab: 'add', editId: e.id, phase: e.ph, cur: 'EUR', amount: String(Math.round(e.a * 100) / 100).replace('.', ','), cat: e.c, paidBy: e.py >= .5 ? 'you' : 'partner', forWhom: e.f, addDay: e.ph === 'trip' ? e.day : S.addDay, spread: e.n > 1, spreadN: e.n > 1 ? e.n : 5, note: e.l || '', saved: false }, false); },
+  cancelEdit: () => set({ editId: null, amount: '', note: '', spread: false, addDay: null, tab: 'history' }, false),
   setPhase: v => set({ phase: v, cat: v === 'pre' ? S.preCats[0].k : S.tripCats[0].k, cur: v === 'pre' ? 'EUR' : 'LOC' }),
   setCur: v => set({ cur: v }), setCat: v => set({ cat: v }), setPaid: v => set({ paidBy: v }), setFor: v => set({ forWhom: v }), setSpread: v => set({ spread: v === 'on' }),
   dayPrev: () => { const V = calc(); set({ addDay: Math.max(1, addDayNow(V) - 1) }); },
@@ -259,8 +275,9 @@ const A = {
     const day = addDayNow(V), al = V.L.find(l => day >= l.s && day <= l.e) || V.cl;
     const eur = isTrip && S.cur === 'LOC' ? amt * al.r : amt;
     const e = { id: Date.now(), ph: S.phase, l: S.note, c: S.cat, a: eur, py: S.paidBy === 'you' ? 1 : 0, f: S.forWhom, day: isTrip ? day : 0, n: isTrip && S.spread ? S.spreadN : 1 };
-    set({ exps: [...S.exps, e], saved: true });
-    setTimeout(() => set({ saved: false, amount: '', note: '', spread: false, addDay: null, tab: 'home' }, false), 900);
+    const id = S.editId;
+    set({ exps: id ? S.exps.map(x => x.id === id ? { ...e, id, auto: x.auto } : x) : [...S.exps, e], saved: true });
+    setTimeout(() => set({ saved: false, amount: '', note: '', spread: false, addDay: null, editId: null, tab: id ? 'history' : 'home' }, false), 900);
   },
   selLeg: v => set({ sel: +v }),
   monthPrev: () => set({ calMonth: Math.max(0, S.calMonth - 1) }), monthNext: () => set({ calMonth: Math.min(12, S.calMonth + 1) }),
@@ -285,6 +302,7 @@ const A = {
 const C = {
   amount: v => { S.amount = v.replace(/[^0-9.,]/g, ''); persist(); },
   note: v => { S.note = v; persist(); },
+  addDate: v => { const t = Date.parse(v); if (t) set({ addDay: Math.max(1, Math.floor((t - calc().START) / DAY) + 1) }); },
   nameA: v => set({ nameA: v }), nameB: v => set({ nameB: v }),
   start: v => v && set({ startISO: v }),
   end: v => { const V = calc(), t = Date.parse(v); if (!t) return; let delta = Math.floor((t - V.START) / DAY) + 1 - V.tot; const legs = S.legs.map(l => ({ ...l })); for (let k = legs.length - 1; k >= 0 && delta !== 0; k--) { const nd = Math.max(1, Math.min(120, legs[k].d + delta)); delta -= nd - legs[k].d; legs[k].d = nd; if (delta > 0) break; } set({ legs }); },
