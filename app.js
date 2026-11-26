@@ -25,7 +25,7 @@ const DEFAULTS = () => ({
   tripCats: [{ k: 'food', l: 'Repas' }, { k: 'stay', l: 'Logement' }, { k: 'transport', l: 'Transport' }, { k: 'act', l: 'Activités' }, { k: 'other', l: 'Autre' }],
   preCats: [{ k: 'flights', l: 'Vols' }, { k: 'insurance', l: 'Assurance' }, { k: 'gear', l: 'Équipement' }, { k: 'health', l: 'Santé & visas' }, { k: 'other', l: 'Autre' }],
   newTrip: '', newPre: '', exps: seed(),
-  phase: 'trip', amount: '', cur: 'LOC', cat: 'food', paidBy: 'you', forWhom: 'both', addDay: null, editId: null, hf: 'all', spread: false, spreadN: 5, note: '', saved: false,
+  phase: 'trip', amount: '', cur: 'LOC', cat: 'food', paidBy: 'you', forWhom: 'both', addDay: null, editId: null, hf: 'all', homeDay: null, addingCat: false, newCat: '', spread: false, spreadN: 5, note: '', saved: false,
 });
 
 let S;
@@ -92,15 +92,24 @@ const vHome = V => {
   else if (tp >= .9) mk('amber', W, 'Budget global bientôt atteint', Math.round(tp * 100) + ' % déjà dépensés.');
   if (margin < 0) mk('amber', W, 'En retard sur le rythme', f0(-margin) + ' de plus que prévu depuis le départ.');
   if (alerts.length < 2 && margin >= 0) mk('mint', OK, 'Tout est sous contrôle', 'Vous avez ' + f0(margin) + " d'avance sur le budget depuis le départ.");
-  const d0 = Math.max(1, today - 6), days = []; for (let d = d0; d < d0 + 10; d++) days.push(d);
-  const maxV = Math.max(dayBud * 1.4, ...days.map(d => D[d] || 0));
-  const bars = days.map(d => ({
-    style: st({ width: '100%', height: ((D[d] || 0) / maxV * 100) + '%', borderRadius: '8px 8px 3px 3px', background: (D[d] || 0) > dayBud ? (d > today ? 'oklch(0.85 0.09 25)' : P.coral.bar) : d === today ? 'var(--a700)' : d > today ? 'var(--a200)' : 'var(--a400)' }),
-    lbl: st({ flex: 1, textAlign: 'center', fontSize: 10, color: d === today ? 'var(--text)' : 'var(--muted)', fontWeight: d === today ? 700 : 400 }), label: dObj(d).getUTCDate(),
-  }));
+  const sd = Math.min(V.tot, Math.max(1, s.homeDay == null ? today : s.homeDay));
+  const legOfDay = d => L.find(l => d >= l.s && d <= l.e) || cl;
+  const sLeg = legOfDay(sd), sBud = sLeg.b, sSp = D[sd] || 0;
+  const wd = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+  const sdObj = dObj(sd), sdLabel = wd[sdObj.getUTCDay()] + ' ' + V.dt(sd);
+  const d0 = Math.min(Math.max(1, sd - 6), Math.max(1, V.tot - 9)), days = []; for (let d = d0; d < d0 + 10 && d <= V.tot; d++) days.push(d);
+  const maxV = Math.max(sBud * 1.4, ...days.map(d => legOfDay(d).b * 1.1), ...days.map(d => D[d] || 0));
+  const bars = days.map(d => {
+    const over = (D[d] || 0) > legOfDay(d).b;
+    return {
+      d, style: st({ width: '100%', height: ((D[d] || 0) / maxV * 100) + '%', borderRadius: '8px 8px 3px 3px', background: over ? (d > today ? 'oklch(0.85 0.09 25)' : P.coral.bar) : d === sd ? 'var(--a700)' : d > today ? 'var(--a200)' : 'var(--a400)', boxShadow: d === sd ? '0 0 0 2px var(--a900)' : 'none' }),
+      lbl: st({ flex: 1, textAlign: 'center', fontSize: 10, cursor: 'pointer', padding: '4px 0', color: d === sd ? 'var(--text)' : 'var(--muted)', fontWeight: d === sd ? 800 : d === today ? 700 : 400 }), label: dObj(d).getUTCDate(),
+    };
+  });
   const ring = (preSpent + tripSpent) / totBudget;
-  const ago = d => d === 0 ? 'Avant le voyage' : today - d === 0 ? "Aujourd'hui" : today - d === 1 ? 'Hier' : today - d < 0 ? 'Dans ' + (d - today) + ' j' : 'Il y a ' + (today - d) + ' j';
-  const recent = V.exps.filter(e => !e.auto).sort((a, b) => (b.day - a.day) || (b.id - a.id)).slice(0, 6);
+  const dayItems = trip.filter(e => sd >= e.day && sd < e.day + e.n).sort((x, y) => y.a / y.n - x.a / x.n);
+  const whoOf = e => (e.py >= 1 ? 'Payé par ' + A : e.py <= 0 ? 'Payé par ' + B : 'Payé à deux') + ' · ' + (e.f === 'both' ? 'Partagé' : e.f === 'you' ? 'Juste ' + A : 'Juste ' + B);
+  const dayRows = dayItems.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--divider);cursor:pointer">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(whoOf(e))}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé : ${f2(e.a)} sur ${e.n} j · jour ${sd - e.day + 1}/${e.n}</span>` : ''}</div><div class="mono" style="font-size:13px;font-weight:700;flex:none">${f2(e.a / e.n)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('');
   return `<div class="col">
   <div class="row sp" style="align-items:flex-start"><div><div class="h1">Notre voyage</div><div class="meta" style="margin-top:2px">${esc(L.map(l => l.n.replace('Nouvelle-Zélande', 'N.-Zélande')).join(' → '))}</div></div>
     <span class="tag" style="${st({ flex: 'none', background: 'oklch(0.94 0.04 240)', color: 'oklch(0.4 0.1 245)' })}">Jour&nbsp;${today}/${V.tot}</span></div>
@@ -112,11 +121,15 @@ const vHome = V => {
     <div class="meta" style="display:flex;gap:14px;margin-top:4px"><span><i style="display:inline-block;width:8px;height:8px;background:var(--a900);margin-right:5px"></i>Avant</span><span><i style="display:inline-block;width:8px;height:8px;background:var(--a500);margin-right:5px"></i>Pendant</span></div></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
     ${[['Avant le voyage', preSpent, PRE_B, 'pre'], ['Pendant le voyage', tripSpent, tripBudget, 'trip']].map(([k, sp, b, v]) => `<div class="card click" data-a="openBudget" data-v="${v}" style="border-radius:24px;padding:12px"><div class="kick">${k}</div><div style="font-size:22px;font-weight:700;margin-top:2px">${f0(sp)}</div><div class="meta">sur&nbsp;${f0(b)}</div><div class="track" style="height:5px;margin-top:8px"><div style="${barFlow(sp / b * 100, P[TONE(sp / b * 100)].bar)}"></div></div></div>`).join('')}</div>
-  <div class="card"><div class="row sp"><div class="kick">Budget du jour · ${esc(cl.n)}</div><span class="tag" style="${pill(daySp > dayBud ? 'coral' : daySp >= .8 * dayBud ? 'amber' : 'mint')}">${daySp > dayBud ? 'Dépassé' : daySp >= .8 * dayBud ? 'Presque atteint' : 'Dans le budget'}</span></div>
-    <div style="display:flex;align-items:baseline;gap:8px;margin:2px 0 12px"><span style="font-size:26px;font-weight:700">${f0(daySp)}</span><span style="font-size:13px;color:var(--muted)">sur&nbsp;${f0(dayBud)} / jour</span></div>
-    <div style="position:relative;height:84px;display:flex;align-items:flex-end;gap:5px"><div style="${st({ position: 'absolute', left: 0, right: 0, bottom: dayBud / maxV * 100 + '%', borderTop: '1px dashed var(--a900)', zIndex: 1, pointerEvents: 'none' })}"><span style="position:absolute;right:0;top:-13px;font-size:9px;color:var(--a900)">budget</span></div>${bars.map(b => `<div style="flex:1;height:100%;display:flex;align-items:flex-end"><div style="${b.style}"></div></div>`).join('')}</div>
-    <div style="display:flex;gap:5px;margin-top:4px">${bars.map(b => `<div style="${b.lbl}">${b.label}</div>`).join('')}</div>
-    <div class="meta" style="margin-top:10px">Marge cumulée depuis le départ : <strong style="color:var(--text)">${(margin >= 0 ? '+' : '−') + f0(Math.abs(margin))}</strong></div></div>
+  <div class="card"><div class="row sp" style="gap:6px"><button type="button" class="btn btn-sec btn-icon" aria-label="Jour précédent" data-a="homeDayPrev" ${sd <= 1 ? 'disabled style="opacity:.4"' : ''}>&lsaquo;</button><div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:800">${sdLabel}</div><div class="meta">Jour ${sd} · ${esc(sLeg.n)}${sd === today ? " · aujourd'hui" : ''}</div></div><button type="button" class="btn btn-sec btn-icon" aria-label="Jour suivant" data-a="homeDayNext" ${sd >= V.tot ? 'disabled style="opacity:.4"' : ''}>&rsaquo;</button></div>
+    ${sd !== today && today >= 1 && today <= V.tot ? '<div style="text-align:center;margin-top:4px"><button type="button" class="btn btn-ghost" style="min-height:36px" data-a="homeDayToday">Revenir à aujourd\'hui</button></div>' : ''}
+    <div class="row sp" style="margin-top:8px"><div class="kick">Budget du jour</div><span class="tag" style="${pill(sSp > sBud ? 'coral' : sSp >= .8 * sBud ? 'amber' : 'mint')}">${sSp > sBud ? 'Dépassé de ' + f0(sSp - sBud) : sSp >= .8 * sBud ? 'Presque atteint' : 'Dans le budget'}</span></div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin:2px 0 12px"><span style="font-size:26px;font-weight:700">${f0(sSp)}</span><span style="font-size:13px;color:var(--muted)">sur&nbsp;${f0(sBud)} / jour</span></div>
+    <div style="position:relative;height:84px;display:flex;align-items:flex-end;gap:5px"><div style="${st({ position: 'absolute', left: 0, right: 0, bottom: sBud / maxV * 100 + '%', borderTop: '1px dashed var(--a900)', zIndex: 1, pointerEvents: 'none' })}"><span style="position:absolute;right:0;top:-13px;font-size:9px;color:var(--a900)">budget</span></div>${bars.map(b => `<div data-a="pickHomeDay" data-v="${b.d}" style="flex:1;height:100%;display:flex;align-items:flex-end;cursor:pointer"><div style="${b.style}"></div></div>`).join('')}</div>
+    <div style="display:flex;gap:5px">${bars.map(b => `<div data-a="pickHomeDay" data-v="${b.d}" style="${b.lbl}">${b.label}</div>`).join('')}</div>
+    <div class="meta" style="margin-top:6px">Touchez un bâton pour voir le détail du jour. Marge cumulée depuis le départ : <strong style="color:var(--text)">${(margin >= 0 ? '+' : '−') + f0(Math.abs(margin))}</strong></div>
+    <div class="kick" style="margin-top:12px">Détail du jour · ${dayItems.length} dépense${dayItems.length > 1 ? 's' : ''}</div>
+    ${dayRows || '<div class="meta" style="padding:10px 0">Aucune dépense ce jour-là.</div>'}</div>
   <div class="card"><div class="kick">Étape actuelle</div><div class="title" style="margin:3px 0 8px">${esc(cl.n)}&nbsp;· Jour&nbsp;${Math.max(1, today - cl.s + 1)}&nbsp;sur&nbsp;${cl.d}</div><div class="track">${bar((today - cl.s + 1) / cl.d * 100)}</div>
     <div class="meta" style="margin-top:8px">${f0(legSpent(cl))}&nbsp;dépensés sur&nbsp;${f0(cl.tot)}&nbsp;· reste&nbsp;${f0(Math.max(0, (cl.tot - legSpent(cl)) / Math.max(1, cl.e - today)))}/jour</div></div>
   <div class="card"><div class="kick">Qui a dépensé</div>
@@ -124,7 +137,7 @@ const vHome = V => {
     <div class="row sp" style="font-size:12px"><span><i style="display:inline-block;width:8px;height:8px;background:var(--a600);margin-right:5px"></i>${esc(A)}&nbsp;· part de&nbsp;${f0(yS)}</span><span><i style="display:inline-block;width:8px;height:8px;background:var(--a300);margin-right:5px"></i>${esc(B)}&nbsp;· part de&nbsp;${f0(all - yS)}</span></div>
     <div class="meta" style="margin:4px 0 6px">Réellement payé : ${esc(A)} ${f0(yP)} · ${esc(B)} ${f0(all - yP)}</div>
     <span class="tag" style="align-self:flex-start;${pill('lav')}">${bal >= 0 ? esc(B) + ' doit ' + f0(bal) + ' à ' + esc(A) : esc(A) + ' doit ' + f0(-bal) + ' à ' + esc(B)}</span></div>
-  <div><div class="kick" style="margin-bottom:4px">Récent</div>${recent.map(e => rowHtml(V, e, ago(e.day))).join('') || '<div class="meta" style="padding:10px 0">Aucune dépense pour le moment.</div>'}</div></div>`;
+</div>`;
 };
 
 function rowHtml(V, e, agoText) {
@@ -150,7 +163,8 @@ const vAdd = V => {
   <div><label class="lbl" style="margin-bottom:5px">Montant</label><div class="row" style="gap:8px"><input class="input" type="text" inputmode="decimal" placeholder="0,00" value="${esc(s.amount)}" data-c="amount" style="flex:1;min-width:0;font-size:20px;font-weight:700">
     ${isTrip ? seg([['LOC', esc(al.c)], ['EUR', 'EUR']], s.cur, 'setCur', 'fit') : ''}</div>
     <div class="meta" style="font-size:12px;margin-top:6px">${loc ? '≈ ' + f2(eur) + ' · 1 ' + esc(al.c) + ' = ' + String(al.r).replace('.', ',') + ' € (taux modifiable dans Plan)' : 'Montant en euros'}</div></div>
-  <div><label class="lbl">Catégorie</label><div class="catgrid">${cats.map(c => `<button type="button" class="cat ${s.cat === c.k ? 'on' : ''}" data-a="setCat" data-v="${esc(c.k)}">${svg(IC[c.k] || TAG, 18, 'currentColor')}<span>${esc(c.l)}</span></button>`).join('')}</div></div>
+  <div><label class="lbl">Catégorie</label><div class="catgrid">${cats.map(c => `<button type="button" class="cat ${s.cat === c.k ? 'on' : ''}" data-a="setCat" data-v="${esc(c.k)}">${svg(IC[c.k] || TAG, 18, 'currentColor')}<span>${esc(c.l)}</span></button>`).join('')}<button type="button" class="cat ${s.addingCat ? 'on' : ''}" style="border-style:dashed" data-a="toggleNewCat">${svg('M12 5v14M5 12h14', 18, 'currentColor')}<span>Nouvelle</span></button></div>
+    ${s.addingCat ? `<div class="row" style="gap:8px;margin-top:10px"><input class="input" type="text" placeholder="Nom de la catégorie" value="${esc(s.newCat)}" data-c="newCat" style="flex:1;min-width:0"><button type="button" class="btn btn-sec" data-a="addInlineCat">Ajouter</button></div>` : ''}</div>
   ${isTrip ? `<div class="col" style="gap:16px"><div><label class="lbl">Date de la dépense (touchez pour ouvrir le calendrier)</label><input class="input" type="date" value="${V.dObj(addDay).toISOString().slice(0, 10)}" data-c="addDate" style="height:48px;font-size:16px;font-weight:700"><div class="meta" style="font-size:12px;margin-top:6px">${dt(addDay)} · Jour ${addDay}${(L.find(l => addDay >= l.s && addDay <= l.e) || {}).n ? ' · ' + esc(L.find(l => addDay >= l.s && addDay <= l.e).n) : ''}</div></div>
     <div class="card" style="border-radius:24px;padding:12px;gap:0"><label class="lbl">Imputation sur le budget</label>${seg([['off', 'Un seul jour'], ['on', 'Lisser sur plusieurs jours']], s.spread ? 'on' : 'off', 'setSpread')}
     ${s.spread ? `<div style="margin-top:12px">${stepper('spreadLess', 'spreadMore', s.spreadN + '&nbsp;jours')}<div style="font-size:12px;margin-top:10px;line-height:1.45"><strong>${f2(eur / n)}</strong> par jour, du&nbsp;${dt(addDay)}&nbsp;au&nbsp;${dt(addDay + s.spreadN - 1)}.</div><div class="meta" style="margin-top:2px">Le budget du jour est impacté de&nbsp;${f2(eur / n)}&nbsp;au lieu de&nbsp;${f2(eur)}.</div></div>` : ''}</div></div>` : ''}
@@ -260,6 +274,16 @@ const A = {
   tab: v => set({ tab: v }, false),
   openBudget: v => set({ tab: 'budget', bview: v }, false),
   delExp: v => set({ exps: S.exps.filter(e => String(e.id) !== v) }),
+  pickHomeDay: v => set({ homeDay: +v }),
+  homeDayPrev: () => { const V = calc(); set({ homeDay: Math.max(1, (S.homeDay == null ? V.today : S.homeDay) - 1) }); },
+  homeDayNext: () => { const V = calc(); set({ homeDay: Math.min(V.tot, (S.homeDay == null ? V.today : S.homeDay) + 1) }); },
+  homeDayToday: () => set({ homeDay: null }),
+  toggleNewCat: () => set({ addingCat: !S.addingCat, newCat: '' }),
+  addInlineCat: () => {
+    const name = S.newCat.trim(); if (!name) return;
+    const list = S.phase === 'trip' ? 'tripCats' : 'preCats', k = 'c' + Date.now();
+    set({ [list]: [...S[list], { k, l: name }], cat: k, addingCat: false, newCat: '' });
+  },
   histFilter: v => set({ hf: v === 'all' || v === 'pre' ? v : +v }),
   editExp: v => { const e = S.exps.find(x => String(x.id) === v); if (!e) return; set({ tab: 'add', editId: e.id, phase: e.ph, cur: 'EUR', amount: String(Math.round(e.a * 100) / 100).replace('.', ','), cat: e.c, paidBy: e.py >= .5 ? 'you' : 'partner', forWhom: e.f, addDay: e.ph === 'trip' ? e.day : S.addDay, spread: e.n > 1, spreadN: e.n > 1 ? e.n : 5, note: e.l || '', saved: false }, false); },
   cancelEdit: () => set({ editId: null, amount: '', note: '', spread: false, addDay: null, tab: 'history' }, false),
@@ -302,6 +326,7 @@ const A = {
 const C = {
   amount: v => { S.amount = v.replace(/[^0-9.,]/g, ''); persist(); },
   note: v => { S.note = v; persist(); },
+  newCat: v => { S.newCat = v; },
   addDate: v => { const t = Date.parse(v); if (t) set({ addDay: Math.max(1, Math.floor((t - calc().START) / DAY) + 1) }); },
   nameA: v => set({ nameA: v }), nameB: v => set({ nameB: v }),
   start: v => v && set({ startISO: v }),
@@ -319,6 +344,7 @@ app.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if
 // Saisie du montant / de la note : mise à jour en direct, sans perdre le focus ni le curseur.
 app.addEventListener('input', e => {
   const el = e.target, c = el.dataset.c;
+  if (c === 'newCat') { S.newCat = el.value; return; }
   if (c !== 'amount' && c !== 'note') return;
   const pos = el.selectionStart;
   C[c](el.value);
