@@ -41,6 +41,11 @@ const MS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 
 const MF = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const f0 = n => Math.round(n).toLocaleString('fr-FR') + ' €';
 const f2 = n => (Math.round(n * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' €';
+// Une dépense garde la monnaie saisie (oc/oa) ; e.a reste son équivalent en euros, utilisé pour tous les budgets.
+const fmtLoc = (n, c) => (Math.round(n * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' ' + c;
+const isLoc = e => !!e.oc && e.oc !== 'EUR' && e.oa > 0;
+const money = (e, k = 1) => isLoc(e) ? { main: fmtLoc(e.oa * k, e.oc), sub: '≈ ' + f2(e.a * k) } : { main: f2(e.a * k), sub: '' };
+const moneyHtml = (e, k = 1, extra = '') => { const m = money(e, k); return `<div style="text-align:right;flex:none"><div class="mono" style="font-size:13px;font-weight:700;${extra}">${m.main}</div>${m.sub ? `<div class="meta mono">${m.sub}</div>` : ''}</div>`; };
 const IC = { food: 'M6 2v8M9 2v8M12 2v8M9 10v12', stay: 'M2 12h20v8H2zM2 16h20M6 12V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4', transport: 'M6 3h12a3 3 0 0 1 3 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a3 3 0 0 1 3-3zM3 11h18M8 3v8M16 3v8M7 17v3M17 17v3M7 14.5h.01M17 14.5h.01', act: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M14.5 9.5L10 10l-.5 4.5L14 14z', other: 'M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2', flights: 'M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z', insurance: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', gear: 'M3 7l4-4h10l4 4-3 3-2-1v12H8V9l-2 1z', health: 'M12 5v14M5 12h14' };
 const TAG = 'M20 12l-8 8-9-9V3h8z';
 const svg = (d, sz = 16, col = 'var(--a700)', sw = 1.5) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="${d}"/></svg>`;
@@ -114,7 +119,7 @@ const vHome = V => {
   const dayItems = trip.filter(e => sd >= e.day && sd < e.day + e.n).sort((x, y) => y.a / y.n - x.a / x.n);
   const soloDay = dayItems.filter(e => !shared(e)).reduce((x, e) => x + e.a / e.n, 0);
   const whoOf = e => (e.py >= 1 ? 'Payé par ' + A : e.py <= 0 ? 'Payé par ' + B : 'Payé à deux') + ' · ' + (e.f === 'both' ? 'Partagé' : e.f === 'you' ? 'Juste ' + A : 'Juste ' + B);
-  const dayRows = dayItems.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--divider);cursor:pointer">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(whoOf(e))}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé : ${f2(e.a)} sur ${e.n} j · jour ${sd - e.day + 1}/${e.n}</span>` : ''}${shared(e) ? '' : `<span class="tag" style="margin-top:4px;${pill('grey')}">Perso · hors budget</span>`}</div></div><div class="mono" style="font-size:13px;font-weight:700;flex:none;${shared(e) ? '' : 'color:var(--muted)'}">${f2(e.a / e.n)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('');
+  const dayRows = dayItems.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--divider);cursor:pointer">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(whoOf(e))}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé : ${money(e).main} sur ${e.n} j · jour ${sd - e.day + 1}/${e.n}</span>` : ''}${shared(e) ? '' : `<span class="tag" style="margin-top:4px;${pill('grey')}">Perso · hors budget</span>`}</div></div>${moneyHtml(e, 1 / e.n, shared(e) ? '' : 'color:var(--muted)')}<button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('');
   return `<div class="col">
   <div class="row sp" style="align-items:flex-start"><div><div class="h1">Notre voyage</div><div class="meta" style="margin-top:2px">${esc(L.map(l => l.n.replace('Nouvelle-Zélande', 'N.-Zélande')).join(' → '))}</div></div>
     <span class="tag" style="${st({ flex: 'none', background: 'oklch(0.94 0.04 240)', color: 'oklch(0.4 0.1 245)' })}">Jour&nbsp;${today}/${V.tot}</span></div>
@@ -149,7 +154,7 @@ const vHome = V => {
 function rowHtml(V, e, agoText) {
   const { A, B, CL } = V;
   const who = (e.py >= 1 ? 'Payé par ' + A : e.py <= 0 ? 'Payé par ' + B : 'Payé à deux') + ' · ' + (e.f === 'both' ? 'Partagé' : e.f === 'you' ? 'Juste ' + A : 'Juste ' + B);
-  return `<div class="item">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc((agoText ? agoText + ' · ' : '') + who)}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}${e.f === 'both' || e.ph === 'pre' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div><div style="font-size:13px;flex:none" class="mono">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`;
+  return `<div class="item">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc((agoText ? agoText + ' · ' : '') + who)}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${money(e, 1 / e.n).main}/j</span>` : ''}${e.f === 'both' || e.ph === 'pre' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div>${moneyHtml(e).replace('font-size:13px;font-weight:700', 'font-size:13px')}<button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`;
 }
 
 const vAdd = V => {
@@ -190,7 +195,7 @@ const vHistory = V => {
   return `<div class="col"><div><div class="h1" style="font-weight:800">Historique</div><div class="meta">Touchez une dépense pour la corriger.</div></div>
   <div style="display:flex;flex-wrap:wrap;gap:6px">${chip('all', 'Tout')}${chip('pre', 'Avant le voyage')}${L.map(l => chip(l.i, l.n)).join('')}</div>
   <div class="card" style="padding:12px 14px;border-radius:22px;gap:0"><div class="row sp" style="align-items:baseline"><span class="kick">${esc(title)}</span><span style="font-size:18px;font-weight:800">${f0(sum(hist))}</span></div><div class="meta">${hist.length} dépense${hist.length > 1 ? 's' : ''}</div></div>
-  <div>${hist.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--divider);cursor:pointer"><div style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--a100);display:flex;align-items:center;justify-content:center">${svg(IC[e.c] || IC.other, 16, 'var(--a700)', 1.8)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(e.ph === 'pre' ? 'Avant le voyage' : dt(e.day) + ' · ' + ((legOf(e.day) || {}).n || '') + (e.auto ? " · cumul de l'étape" : ''))}</div><div class="meta">${esc(who(e))}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}${e.f === 'both' || e.ph === 'pre' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div><div class="mono" style="font-size:13px;font-weight:700;flex:none">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('')}</div></div>`;
+  <div>${hist.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--divider);cursor:pointer"><div style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--a100);display:flex;align-items:center;justify-content:center">${svg(IC[e.c] || IC.other, 16, 'var(--a700)', 1.8)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(e.ph === 'pre' ? 'Avant le voyage' : dt(e.day) + ' · ' + ((legOf(e.day) || {}).n || '') + (e.auto ? " · cumul de l'étape" : ''))}</div><div class="meta">${esc(who(e))}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${money(e, 1 / e.n).main}/j</span>` : ''}${e.f === 'both' || e.ph === 'pre' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div>${moneyHtml(e)}<button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('')}</div></div>`;
 };
 
 const vBudget = V => {
@@ -311,7 +316,7 @@ const A = {
     set({ [list]: [...S[list], { k, l: name }], cat: k, addingCat: false, newCat: '' });
   },
   histFilter: v => set({ hf: v === 'all' || v === 'pre' ? v : +v }),
-  editExp: v => { const e = S.exps.find(x => String(x.id) === v); if (!e) return; set({ tab: 'add', editId: e.id, phase: e.ph, cur: 'EUR', amount: String(Math.round(e.a * 100) / 100).replace('.', ','), cat: e.c, paidBy: e.py >= .5 ? 'you' : 'partner', forWhom: e.f, addDay: e.ph === 'trip' ? e.day : S.addDay, spread: e.n > 1, spreadN: e.n > 1 ? e.n : 5, note: e.l || '', saved: false }, false); },
+  editExp: v => { const e = S.exps.find(x => String(x.id) === v); if (!e) return; const V = calc(), al = V.L.find(l => e.day >= l.s && e.day <= l.e), back = e.ph === 'trip' && isLoc(e) && al && al.c === e.oc; set({ tab: 'add', editId: e.id, phase: e.ph, cur: back ? 'LOC' : 'EUR', amount: String(Math.round((back ? e.oa : e.a) * 100) / 100).replace('.', ','), cat: e.c, paidBy: e.py >= .5 ? 'you' : 'partner', forWhom: e.f, addDay: e.ph === 'trip' ? e.day : S.addDay, spread: e.n > 1, spreadN: e.n > 1 ? e.n : 5, note: e.l || '', saved: false }, false); },
   cancelEdit: () => set({ editId: null, amount: '', note: '', spread: false, addDay: null, tab: 'history' }, false),
   setPhase: v => set({ phase: v, cat: v === 'pre' ? S.preCats[0].k : S.tripCats[0].k, cur: v === 'pre' ? 'EUR' : 'LOC' }),
   setCur: v => set({ cur: v }), setCat: v => set({ cat: v }), setPaid: v => set({ paidBy: v }), setFor: v => set({ forWhom: v }), setSpread: v => set({ spread: v === 'on' }),
@@ -323,8 +328,12 @@ const A = {
     const amt = parseFloat(String(S.amount).replace(',', '.')) || 0;
     if (amt <= 0 || S.saved) return;
     const day = addDayNow(V), al = V.L.find(l => day >= l.s && day <= l.e) || V.cl;
-    const eur = isTrip && S.cur === 'LOC' ? amt * al.r : amt;
-    const e = { id: Date.now(), ph: S.phase, l: S.note, c: S.cat, a: eur, py: S.paidBy === 'you' ? 1 : 0, f: S.forWhom, day: isTrip ? day : 0, n: isTrip && S.spread ? S.spreadN : 1 };
+    const loc = isTrip && S.cur === 'LOC';
+    let eur = loc ? amt * al.r : amt, oc = loc ? al.c : 'EUR', oa = amt;
+    const old = S.editId && S.exps.find(x => x.id === S.editId);
+    // Modification sans changer le montant ni la monnaie : on garde l'équivalent en euros d'origine (le taux a pu changer depuis).
+    if (old && isLoc(old) && loc && old.oc === al.c && Math.abs(old.oa - amt) < 0.005) eur = old.a;
+    const e = { id: Date.now(), oc, oa, ph: S.phase, l: S.note, c: S.cat, a: eur, py: S.paidBy === 'you' ? 1 : 0, f: S.forWhom, day: isTrip ? day : 0, n: isTrip && S.spread ? S.spreadN : 1 };
     const id = S.editId;
     set({ exps: id ? S.exps.map(x => x.id === id ? { ...e, id, auto: x.auto } : x) : [...S.exps, e], saved: true });
     setTimeout(() => set({ saved: false, amount: '', note: '', spread: false, addDay: null, editId: null, tab: id ? 'history' : 'home' }, false), 900);
@@ -391,7 +400,7 @@ app.addEventListener('change', e => {
   if (el.dataset.c && C[el.dataset.c]) C[el.dataset.c](el.value, el);
 });
 render();
-const VERSION = 'v9'; // à garder aligné avec CACHE dans sw.js
+const VERSION = 'v10'; // à garder aligné avec CACHE dans sw.js
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
