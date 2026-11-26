@@ -62,10 +62,11 @@ function calc() {
   const cl = L[cur];
   const trip = exps.filter(e => e.ph === 'trip'), pre = exps.filter(e => e.ph === 'pre');
   const sum = a => a.reduce((x, e) => x + e.a, 0);
-  // Dépenses « perso » (pour une seule personne) : comptées dans le total de la personne, mais hors budgets (jour, étape, avant/pendant).
+  // Pendant le voyage, les dépenses « perso » (pour une seule personne) sont comptées dans le total de la personne mais hors budgets (jour, étape, voyage).
+  // Avant le voyage, toutes les dépenses comptent dans le budget, même pour une seule personne.
   const shared = e => e.f === 'both';
-  const preSpent = sum(pre.filter(shared)), tripSpent = sum(trip.filter(shared)), PRE_B = s.preBudget;
-  const preSolo = sum(pre) - preSpent, tripSolo = sum(trip) - tripSpent;
+  const preSpent = sum(pre), tripSpent = sum(trip.filter(shared)), PRE_B = s.preBudget;
+  const preSolo = 0, tripSolo = sum(trip) - tripSpent;
   const tripBudget = L.reduce((a, l) => a + l.tot, 0), totBudget = PRE_B + tripBudget;
   const D = {}; trip.filter(shared).forEach(e => { for (let k = 0; k < e.n; k++) D[e.day + k] = (D[e.day + k] || 0) + e.a / e.n; });
   const legSpent = l => { let t = 0; for (let d = l.s; d <= l.e; d++) t += D[d] || 0; return t; };
@@ -148,7 +149,7 @@ const vHome = V => {
 function rowHtml(V, e, agoText) {
   const { A, B, CL } = V;
   const who = (e.py >= 1 ? 'Payé par ' + A : e.py <= 0 ? 'Payé par ' + B : 'Payé à deux') + ' · ' + (e.f === 'both' ? 'Partagé' : e.f === 'you' ? 'Juste ' + A : 'Juste ' + B);
-  return `<div class="item">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc((agoText ? agoText + ' · ' : '') + who)}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}${e.f === 'both' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div><div style="font-size:13px;flex:none" class="mono">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`;
+  return `<div class="item">${svg(IC[e.c] || IC.other)}<div style="flex:1;min-width:0"><div style="font-size:13px">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc((agoText ? agoText + ' · ' : '') + who)}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}${e.f === 'both' || e.ph === 'pre' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div><div style="font-size:13px;flex:none" class="mono">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`;
 }
 
 const vAdd = V => {
@@ -174,7 +175,7 @@ const vAdd = V => {
     <div class="card" style="border-radius:24px;padding:12px;gap:0"><label class="lbl">Imputation sur le budget</label>${seg([['off', 'Un seul jour'], ['on', 'Lisser sur plusieurs jours']], s.spread ? 'on' : 'off', 'setSpread')}
     ${s.spread ? `<div style="margin-top:12px">${stepper('spreadLess', 'spreadMore', s.spreadN + '&nbsp;jours')}<div style="font-size:12px;margin-top:10px;line-height:1.45"><strong>${f2(eur / n)}</strong> par jour, du&nbsp;${dt(addDay)}&nbsp;au&nbsp;${dt(addDay + s.spreadN - 1)}.</div><div class="meta" style="margin-top:2px">${s.forWhom === 'both' ? 'Le budget du jour est impacté de&nbsp;' + f2(eur / n) + '&nbsp;au lieu de&nbsp;' + f2(eur) + '.' : 'Dépense perso : le budget du jour n\'est pas impacté.'}</div></div>` : ''}</div></div>` : ''}
   <div><label class="lbl">Payé par</label>${seg([['you', esc(A)], ['partner', esc(B)]], s.paidBy, 'setPaid')}</div>
-  <div><label class="lbl">Pour</label>${seg([['you', esc(A)], ['partner', esc(B)], ['both', 'Les deux']], s.forWhom, 'setFor')}<div class="meta" style="margin-top:6px">${esc(shareText)}</div>${s.forWhom !== 'both' ? '<div class="meta" style="margin-top:4px;color:var(--a800);font-weight:700">Dépense perso : comptée dans le total de la personne, mais hors budget du jour, de l\'étape et du voyage.</div>' : ''}</div>
+  <div><label class="lbl">Pour</label>${seg([['you', esc(A)], ['partner', esc(B)], ['both', 'Les deux']], s.forWhom, 'setFor')}<div class="meta" style="margin-top:6px">${esc(shareText)}</div>${s.forWhom !== 'both' && isTrip ? '<div class="meta" style="margin-top:4px;color:var(--a800);font-weight:700">Dépense perso : comptée dans le total de la personne, mais hors budget du jour, de l\'étape et du voyage.</div>' : ''}</div>
   <div class="field"><label>Note (facultatif)</label><input class="input" type="text" placeholder="ex. Trek de 5 jours" value="${esc(s.note)}" data-c="note"></div>
   <button type="button" class="btn btn-primary" data-a="save">${s.saved ? 'Enregistré ✓' : amt > 0 ? (s.editId ? 'Enregistrer les modifications' : 'Enregistrer') : 'Saisissez un montant'}</button>${s.editId ? '<button type="button" class="btn btn-sec" style="height:44px" data-a="cancelEdit">Annuler la modification</button>' : ''}</div>`;
 };
@@ -189,7 +190,7 @@ const vHistory = V => {
   return `<div class="col"><div><div class="h1" style="font-weight:800">Historique</div><div class="meta">Touchez une dépense pour la corriger.</div></div>
   <div style="display:flex;flex-wrap:wrap;gap:6px">${chip('all', 'Tout')}${chip('pre', 'Avant le voyage')}${L.map(l => chip(l.i, l.n)).join('')}</div>
   <div class="card" style="padding:12px 14px;border-radius:22px;gap:0"><div class="row sp" style="align-items:baseline"><span class="kick">${esc(title)}</span><span style="font-size:18px;font-weight:800">${f0(sum(hist))}</span></div><div class="meta">${hist.length} dépense${hist.length > 1 ? 's' : ''}</div></div>
-  <div>${hist.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--divider);cursor:pointer"><div style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--a100);display:flex;align-items:center;justify-content:center">${svg(IC[e.c] || IC.other, 16, 'var(--a700)', 1.8)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(e.ph === 'pre' ? 'Avant le voyage' : dt(e.day) + ' · ' + ((legOf(e.day) || {}).n || '') + (e.auto ? " · cumul de l'étape" : ''))}</div><div class="meta">${esc(who(e))}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}${e.f === 'both' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div><div class="mono" style="font-size:13px;font-weight:700;flex:none">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('')}</div></div>`;
+  <div>${hist.map(e => `<div data-a="editExp" data-v="${e.id}" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--divider);cursor:pointer"><div style="flex:none;width:34px;height:34px;border-radius:50%;background:var(--a100);display:flex;align-items:center;justify-content:center">${svg(IC[e.c] || IC.other, 16, 'var(--a700)', 1.8)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(e.l || CL[e.c] || 'Autre')}</div><div class="meta">${esc(e.ph === 'pre' ? 'Avant le voyage' : dt(e.day) + ' · ' + ((legOf(e.day) || {}).n || '') + (e.auto ? " · cumul de l'étape" : ''))}</div><div class="meta">${esc(who(e))}</div>${e.n > 1 ? `<span class="tag" style="margin-top:4px;${pill('lav')}">Lissé sur ${e.n} j · ${f2(e.a / e.n)}/j</span>` : ''}${e.f === 'both' || e.ph === 'pre' ? '' : `<span class="tag" style="margin:4px 0 0 4px;${pill('grey')}">Perso · hors budget</span>`}</div><div class="mono" style="font-size:13px;font-weight:700;flex:none">${f2(e.a)}</div><button type="button" class="del" aria-label="Supprimer" data-a="delExp" data-v="${e.id}">&times;</button></div>`).join('')}</div></div>`;
 };
 
 const vBudget = V => {
@@ -379,7 +380,7 @@ app.addEventListener('change', e => {
   if (el.dataset.c && C[el.dataset.c]) C[el.dataset.c](el.value, el);
 });
 render();
-const VERSION = 'v6'; // à garder aligné avec CACHE dans sw.js
+const VERSION = 'v7'; // à garder aligné avec CACHE dans sw.js
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
