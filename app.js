@@ -195,10 +195,21 @@ const vHistory = V => {
 
 const vBudget = V => {
   const { s, A, B, L, cur, tot, pre, trip, preSpent, tripSpent, PRE_B, tripBudget, legSpent, CL, exps, preSolo, tripSolo, shared } = V;
-  const part = (w, list) => list.reduce((x, e) => x + e.a * (e.f === w ? 1 : e.f === 'both' ? .5 : 0), 0);
-  const people = `<div class="card" style="padding:12px 14px"><div class="kick" style="margin-bottom:8px">Part dépensée par personne</div><div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:4px 6px;align-items:baseline">
-    <div></div>${['Avant', 'Pendant', 'Total'].map(h => `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:right">${h}</div>`).join('')}
-    ${[['you', A], ['partner', B]].map(([w, nm]) => `<div style="font-size:13px;font-weight:700;padding-top:6px;overflow:hidden;text-overflow:ellipsis">${esc(nm)}</div><div class="mono" style="font-size:12px;text-align:right;padding-top:6px">${f0(part(w, pre))}</div><div class="mono" style="font-size:12px;text-align:right;padding-top:6px">${f0(part(w, trip))}</div><div class="mono" style="font-size:16px;font-weight:700;text-align:right;padding-top:4px">${f0(part(w, exps))}</div>`).join('')}</div></div>`;
+  const sharedPart = list => list.reduce((x, e) => x + (e.f === 'both' ? e.a * .5 : 0), 0);
+  const persoPart = (w, list) => list.reduce((x, e) => x + (e.f === w ? e.a : 0), 0);
+  const cShared = 'var(--a500)', cPerso = P.amber.bar;
+  const personBlock = (w, nm) => {
+    const sh = [sharedPart(pre), sharedPart(trip)], pe = [persoPart(w, pre), persoPart(w, trip)];
+    const shT = sh[0] + sh[1], peT = pe[0] + pe[1], tot = shT + peT;
+    const cell = (v, bold) => `<div class="mono" style="font-size:${bold ? 13 : 12}px;font-weight:${bold ? 800 : 400};text-align:right">${f0(v)}</div>`;
+    return `<div style="padding:12px 0;border-top:1px solid var(--divider)"><div class="row sp" style="align-items:baseline"><span style="font-size:15px;font-weight:800">${esc(nm)}</span><span class="mono" style="font-size:22px;font-weight:800">${f0(tot)}</span></div>
+      <div style="height:10px;display:flex;border-radius:99px;overflow:hidden;background:oklch(0.94 0.015 270);margin:8px 0 10px"><div style="width:${shT / Math.max(1, tot) * 100}%;background:${cShared}"></div><div style="width:${peT / Math.max(1, tot) * 100}%;background:${cPerso}"></div></div>
+      <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:5px 6px;align-items:baseline">
+        <div></div>${['Avant', 'Pendant', 'Total'].map(h => `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:right">${h}</div>`).join('')}
+        <div style="font-size:12px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cShared};margin-right:6px"></i>Partagé</div>${cell(sh[0])}${cell(sh[1])}${cell(shT, 1)}
+        <div style="font-size:12px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cPerso};margin-right:6px"></i>Perso (bonus)</div>${cell(pe[0])}${cell(pe[1])}${cell(peT, 1)}</div></div>`;
+  };
+  const people = `<div class="card" style="padding:12px 14px 2px"><div class="kick" style="margin-bottom:8px">Qui a dépensé quoi</div>${personBlock('you', A)}${personBlock('partner', B)}<div class="meta" style="padding:2px 0 12px">Partagé = moitié des dépenses faites pour vous deux. Perso = dépenses faites pour une seule personne.</div></div>`;
   let body;
   if (s.bview === 'pre') {
     body = `<div class="card"><div class="kick">Préparation du voyage</div><div style="display:flex;align-items:baseline;gap:8px;margin:2px 0 8px"><span style="font-size:28px;font-weight:700">${f0(preSpent)}</span><span style="font-size:13px;color:var(--muted)">sur&nbsp;${f0(PRE_B)}</span></div><div class="track"><div style="${barFlow(preSpent / PRE_B * 100, P[TONE(preSpent / PRE_B * 100)].bar)}"></div></div><div class="meta" style="margin-top:8px">Reste&nbsp;${f0(PRE_B - preSpent)}&nbsp;·&nbsp;${pre.length}&nbsp;dépenses${preSolo > 0 ? '&nbsp;·&nbsp;+' + f0(preSolo) + '&nbsp;perso hors budget' : ''}</div></div>
@@ -380,7 +391,7 @@ app.addEventListener('change', e => {
   if (el.dataset.c && C[el.dataset.c]) C[el.dataset.c](el.value, el);
 });
 render();
-const VERSION = 'v8'; // à garder aligné avec CACHE dans sw.js
+const VERSION = 'v9'; // à garder aligné avec CACHE dans sw.js
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
