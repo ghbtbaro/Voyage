@@ -16,6 +16,10 @@
 </head>
 <body>
 <div id="app"><main id="main"></main><nav class="tabs" id="tabs"></nav></div>
+<script>
+// Filet de sécurité : si app.js n'a pas démarré après 4 s, on l'indique au lieu de laisser un écran vide.
+setTimeout(function () { if (!window.__started) document.getElementById('main').innerHTML = '<div style="padding:24px 4px"><h2>Chargement impossible</h2><p>L\'application n\'a pas démarré. Vérifie ta connexion puis recharge.</p><p><button onclick="location.reload()" style="height:44px;padding:0 18px;border-radius:999px;border:1px solid #ccc;background:#fff">Recharger</button></p></div>'; }, 4000);
+</script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -263,7 +263,16 @@ const vSettings = V => {
 
 const TABS = [['home', 'Accueil', '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'], ['add', 'Ajouter', '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'], ['history', 'Historique', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'], ['budget', 'Budget', '<line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="7"/><line x1="19" y1="20" x2="19" y2="14"/>'], ['plan', 'Plan', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'], ['settings', 'Réglages', '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>']];
 
+// Écran de secours : si l'affichage plante (données inattendues), on montre l'erreur et on laisse sauvegarder ou réinitialiser.
+function fatal(err) {
+  window.__started = true;
+  document.getElementById('main').innerHTML = `<div class="col"><div class="h1">Oups</div><div class="card"><div>L'appli a rencontré un problème à l'affichage. Tes données sont toujours sur le téléphone.</div><div class="meta" style="word-break:break-word;margin-top:6px">${esc((err && (err.stack || err.message)) || err)}</div></div><button type="button" class="btn btn-sec" data-a="exportRaw">Exporter mes données brutes</button><button type="button" class="btn btn-sec" data-a="reload">Recharger</button><button type="button" class="btn btn-sec btn-danger" data-a="resetAll">Réinitialiser l'app (efface les données)</button></div>`;
+}
 function render() {
+  try { renderApp(); } catch (e) { fatal(e); }
+  window.__started = true;
+}
+function renderApp() {
   const main = document.getElementById('main'), y = main.scrollTop;
   const V = calc();
   main.innerHTML = { home: vHome, add: vAdd, history: vHistory, budget: vBudget, plan: vPlan, settings: vSettings }[S.tab](V);
@@ -319,8 +328,11 @@ const A = {
   addCat: (v, el) => { const kind = el.dataset.kind, f = 'new' + kind, list = kind === 'Trip' ? 'tripCats' : 'preCats'; if (S[f].trim()) set({ [list]: [...S[list], { k: 'c' + Date.now(), l: S[f].trim() }], [f]: '' }); },
   delCat: (v, el) => { const list = el.dataset.kind === 'Trip' ? 'tripCats' : 'preCats'; if (S[list].length > 1) set({ [list]: S[list].filter(c => c.k !== v) }); },
   clearExps: () => { if (confirm('Supprimer toutes les dépenses enregistrées ?')) set({ exps: [] }); },
-  exportData: async () => {
-    const blob = new Blob([JSON.stringify(S)], { type: 'application/json' }), name = 'voyage-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.json';
+  reload: () => location.reload(),
+  resetAll: () => { if (confirm('Effacer toutes les données et repartir de zéro ?')) { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); } },
+  exportRaw: () => A.exportData(localStorage.getItem(KEY) || '{}'),
+  exportData: async raw => {
+    const blob = new Blob([typeof raw === 'string' ? raw : JSON.stringify(S)], { type: 'application/json' }), name = 'voyage-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.json';
     const file = new File([blob], name, { type: 'application/json' });
     try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } } catch (e) { if (e.name === 'AbortError') return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
@@ -367,12 +379,13 @@ app.addEventListener('change', e => {
   if (el.dataset.c && C[el.dataset.c]) C[el.dataset.c](el.value, el);
 });
 render();
-const VERSION = 'v5'; // à garder aligné avec CACHE dans sw.js
+const VERSION = 'v6'; // à garder aligné avec CACHE dans sw.js
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
   // Nouvelle version prête : on recharge une seule fois pour l'afficher tout de suite.
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  window.addEventListener('error', e => fatal(e.error || e.message));
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
     reg.update();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
