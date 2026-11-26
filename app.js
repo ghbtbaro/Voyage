@@ -256,7 +256,7 @@ const vSettings = V => {
   <div class="card"><div class="kick">Budgets</div><div class="row sp" style="margin-top:10px"><span style="font-size:12px">Avant le voyage</span><div class="row" style="gap:8px"><button type="button" class="btn btn-sec btn-icon" data-a="preLess">&minus;</button><input class="input" type="text" inputmode="numeric" value="${s.preBudget || ''}" data-c="preBudget" style="width:84px;text-align:center;font-size:18px;font-weight:700;padding:0 4px"><span style="font-size:12px">€</span><button type="button" class="btn btn-sec btn-icon" data-a="preMore">+</button></div></div>
     <div class="meta" style="margin-top:10px">Budget journalier et taux de change : par étape, dans l'onglet Plan.</div></div>
   ${catEditor('Catégories · pendant le voyage', s.tripCats, 'Trip', s.newTrip)}${catEditor('Catégories · avant le voyage', s.preCats, 'Pre', s.newPre)}
-  <div class="card" style="gap:10px"><div class="kick">Données</div><div class="meta" style="font-size:12px">Tout est enregistré sur ce téléphone, sans connexion. Pensez à exporter une sauvegarde de temps en temps.</div>
+  <div class="card" style="gap:10px"><div class="kick">Données · version ${VERSION}</div><div class="meta" style="font-size:12px">Tout est enregistré sur ce téléphone, sans connexion. Pensez à exporter une sauvegarde de temps en temps.</div>
     <button type="button" class="btn btn-sec" data-a="exportData">Exporter une sauvegarde</button><button type="button" class="btn btn-sec" data-a="importData">Importer une sauvegarde</button><input type="file" id="importFile" accept="application/json,.json" hidden>
     <button type="button" class="btn btn-sec btn-danger" data-a="clearExps">Supprimer toutes les dépenses (exemples)</button></div></div>`;
 };
@@ -367,4 +367,14 @@ app.addEventListener('change', e => {
   if (el.dataset.c && C[el.dataset.c]) C[el.dataset.c](el.value, el);
 });
 render();
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+const VERSION = 'v5'; // à garder aligné avec CACHE dans sw.js
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  // Nouvelle version prête : on recharge une seule fois pour l'afficher tout de suite.
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.update();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
+  }).catch(() => {}));
+}
