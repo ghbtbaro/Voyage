@@ -41,7 +41,7 @@ const MS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 
 const MF = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const f0 = n => Math.round(n).toLocaleString('fr-FR') + ' €';
 const f2 = n => (Math.round(n * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' €';
-const IC = { food: 'M6 2v8M9 2v8M12 2v8M9 10v12', stay: 'M2 12h20v8H2zM2 16h20M6 12V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4', transport: 'M3 10h18v7H3zM5 10l2-5h10l2 5M7 17v2M17 17v2', act: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M14.5 9.5L10 10l-.5 4.5L14 14z', other: 'M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2', flights: 'M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z', insurance: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', gear: 'M3 7l4-4h10l4 4-3 3-2-1v12H8V9l-2 1z', health: 'M12 5v14M5 12h14' };
+const IC = { food: 'M6 2v8M9 2v8M12 2v8M9 10v12', stay: 'M2 12h20v8H2zM2 16h20M6 12V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4', transport: 'M6 3h12a3 3 0 0 1 3 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a3 3 0 0 1 3-3zM3 11h18M8 3v8M16 3v8M7 17v3M17 17v3M7 14.5h.01M17 14.5h.01', act: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M14.5 9.5L10 10l-.5 4.5L14 14z', other: 'M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2', flights: 'M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z', insurance: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', gear: 'M3 7l4-4h10l4 4-3 3-2-1v12H8V9l-2 1z', health: 'M12 5v14M5 12h14' };
 const TAG = 'M20 12l-8 8-9-9V3h8z';
 const svg = (d, sz = 16, col = 'var(--a700)', sw = 1.5) => `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="${d}"/></svg>`;
 const seg = (opts, cur, act, cls = '') => `<div class="seg ${cls}">${opts.map(([v, l]) => `<button type="button" class="${cur === v ? 'on' : ''}" data-a="${act}" data-v="${esc(v)}">${l}</button>`).join('')}</div>`;
@@ -380,7 +380,7 @@ app.addEventListener('change', e => {
   if (el.dataset.c && C[el.dataset.c]) C[el.dataset.c](el.value, el);
 });
 render();
-const VERSION = 'v7'; // à garder aligné avec CACHE dans sw.js
+const VERSION = 'v8'; // à garder aligné avec CACHE dans sw.js
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
